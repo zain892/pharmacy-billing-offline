@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Pharmacy Billing</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#f3f6f4;--card:#fff;--ink:#16221d;--mut:#5d6f66;--line:#d5dfd9;--pri:#0b6b53;--warn:#b4430c;--bad:#b3261e}
+*{box-sizing:border-box}body{margin:0;font:15px/1.4 "Segoe UI",Tahoma,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--pri);color:#fff;display:flex;gap:6px;align-items:center;padding:8px 14px;flex-wrap:wrap}
+header h1{font-size:17px;margin:0 18px 0 0}
+nav button{background:transparent;color:#d8efe7;border:0;padding:8px 14px;font-size:15px;cursor:pointer;border-radius:6px}
+nav button.on{background:#fff;color:var(--pri);font-weight:600}
+main{max-width:1100px;margin:14px auto;padding:0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:14px}
+h2{font-size:16px;margin:0 0 10px}
+input,select{padding:8px 10px;border:1px solid #b7c6bd;border-radius:6px;font-size:15px;width:100%}
+input:focus,button:focus-visible{outline:2px solid var(--pri);outline-offset:1px}
+label{font-size:13px;color:var(--mut);display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.btn{background:var(--pri);color:#fff;border:0;padding:9px 16px;border-radius:6px;font-size:15px;cursor:pointer}
+.btn.alt{background:#e5ece8;color:var(--ink)}.btn.bad{background:var(--bad)}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
+th{font-size:13px;color:var(--mut);font-weight:600}td.r,th.r{text-align:right}
+td input{padding:4px 6px;width:70px}
+.big{font-size:26px;font-weight:700}.row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.warn{color:var(--warn);font-weight:600}.bad{color:var(--bad);font-weight:600}.mut{color:var(--mut)}
+.hide{display:none}#res div{padding:8px;border:1px solid var(--line);border-top:0;cursor:pointer;background:#fff}
+#res div:hover{background:#e8f3ee}#msg{min-height:20px;margin-top:6px;font-weight:600}
+#rcpt{display:none}
+@media print{
+ @page{size:80mm auto;margin:2mm}
+ body{background:#fff}header,main{display:none!important}
+ #rcpt{display:block;width:72mm;font:12px/1.3 monospace;color:#000}
+ #rcpt table td,#rcpt table th{border:0;padding:1px 0;font-size:12px;color:#000}
+ #rcpt hr{border:0;border-top:1px dashed #000}
+}
+</style></head><body>
+<header><h1>Pharmacy Billing</h1><nav id="nav">
+<button data-t="bill" class="on">Billing</button><button data-t="meds">Medicines</button>
+<button data-t="rep">Reports</button><button data-t="set">Backup &amp; shop</button></nav></header>
+<main>
+<div id="disk" class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span id="disk_t">Checking data folder…</span><button class="btn hide" id="disk_b"></button></div>
+<section id="bill">
+ <div class="card"><h2>Scan barcode or type medicine name, then press Enter</h2>
+  <input id="scan" autocomplete="off" placeholder="Scan here…"><div id="res"></div><div id="msg"></div></div>
+ <div class="card"><table><thead><tr><th>Medicine</th><th class="r">Price</th><th>Qty</th><th class="r">Amount</th><th></th></tr></thead><tbody id="cart"></tbody></table>
+  <p class="mut" id="empty">Cart is empty. Scan a medicine to start the bill.</p>
+  <div class="row" style="justify-content:space-between;margin-top:12px">
+   <div style="width:160px"><label>Discount (PKR)</label><input id="disc" type="number" min="0" value="0"></div>
+   <div style="text-align:right"><div class="mut">Total</div><div class="big" id="tot">0</div></div></div>
+  <div class="row" style="margin-top:12px"><button class="btn" id="pay">Save &amp; print bill</button><button class="btn alt" id="clr">Clear</button></div></div>
+</section>
+<section id="meds" class="hide">
+ <div class="card"><h2 id="mt">Add medicine</h2>
+  <div class="grid">
+   <div><label>Barcode (scan or type)</label><input id="m_bc" autocomplete="off"></div>
+   <div><label>Name</label><input id="m_name"></div><div><label>Batch</label><input id="m_batch"></div>
+   <div><label>Expiry</label><input id="m_exp" type="date"></div>
+   <div><label>Buy price</label><input id="m_buy" type="number" min="0" step="0.01"></div>
+   <div><label>Sell price</label><input id="m_sell" type="number" min="0" step="0.01"></div>
+   <div><label>Quantity in stock</label><input id="m_qty" type="number" min="0"></div>
+   <div><label>Low-stock alert at</label><input id="m_min" type="number" min="0" value="10"></div></div>
+  <div class="row" style="margin-top:12px"><button class="btn" id="m_save">Save medicine</button><button class="btn alt" id="m_cancel">Cancel edit</button></div><div id="m_msg" class="mut" style="margin-top:6px"></div></div>
+ <div class="card"><input id="m_find" placeholder="Search medicines by name or barcode" style="margin-bottom:10px">
+  <div style="overflow-x:auto"><table><thead><tr><th>Name</th><th>Barcode</th><th>Batch</th><th>Expiry</th><th class="r">Sell</th><th class="r">Stock</th><th></th></tr></thead><tbody id="mlist"></tbody></table></div></div>
+</section>
+<section id="rep" class="hide">
+ <div class="card"><div class="row"><div><label>Day</label><input id="r_day" type="date"></div>
+  <div><div class="mut">Sales that day</div><div class="big" id="r_tot">0</div></div><div><div class="mut">Bills</div><div class="big" id="r_n">0</div></div></div></div>
+ <div class="card"><h2>Bills</h2><table><tbody id="r_list"></tbody></table></div>
+ <div class="card"><h2>Low stock</h2><table><tbody id="r_low"></tbody></table></div>
+ <div class="card"><h2>Expired or expiring within 60 days</h2><table><tbody id="r_exp"></tbody></table></div>
+</section>
+<section id="set" class="hide">
+ <div class="card"><h2>Shop details (printed on the bill)</h2><div class="grid">
+  <div><label>Shop name</label><input id="s_name"></div><div><label>Address</label><input id="s_addr"></div><div><label>Phone</label><input id="s_ph"></div></div>
+  <button class="btn" id="s_save" style="margin-top:12px">Save shop details</button></div>
+ <div class="card"><h2>Backup</h2><p class="mut">Download a backup every day and copy it to a USB drive. If browser data is cleared, restore from this file.</p>
+  <div class="row"><button class="btn" id="b_out">Download backup</button>
+  <div><label>Restore from backup file</label><input type="file" id="b_in" accept=".json"></div></div><p id="b_msg" class="mut"></p></div>
+</section>
+</main>
+<div id="rcpt"></div>
+<script>
+const $=id=>document.getElementById(id),K="pharmacy_db_v1";
+let db={meds:[],sales:[],shop:{name:"My Pharmacy",addr:"",phone:""},next:1},cart=[],editId=null;
+try{const s=localStorage.getItem(K);if(s)db=Object.assign(db,JSON.parse(s))}catch(e){}
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+let wq=Promise.resolve();
+function save(){db.saved=Date.now();try{localStorage.setItem(K,JSON.stringify(db))}catch(e){if(!dirH)alert("Could not save data. Download a backup now.")}wq=wq.then(writeDisk)}
+const money=n=>Math.round(n*100)/100,today=()=>new Date().toISOString().slice(0,10);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function msg(t,bad){const m=$("msg");m.textContent=t;m.style.color=bad?"var(--bad)":"var(--pri)"}
+// tabs
+$("nav").onclick=e=>{const t=e.target.dataset.t;if(!t)return;
+ document.querySelectorAll("main>section").forEach(s=>s.classList.toggle("hide",s.id!==t));
+ document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b===e.target));
+ if(t==="bill")$("scan").focus();if(t==="meds")listMeds();if(t==="rep")report();if(t==="set")loadShop()};
+// billing
+function addToCart(m){const c=cart.find(x=>x.id===m.id),have=c?c.qty:0;
+ if(have+1>m.qty){msg(m.name+": only "+m.qty+" in stock",1);return}
+ if(c)c.qty++;else cart.push({id:m.id,name:m.name,price:m.sell,qty:1});
+ msg("Added "+m.name);drawCart()}
+function drawCart(){$("empty").classList.toggle("hide",cart.length>0);
+ $("cart").innerHTML=cart.map((c,i)=>`<tr><td>${esc(c.name)}</td><td class="r">${c.price}</td>
+ <td><input type="number" min="1" value="${c.qty}" data-i="${i}" class="q"></td><td class="r">${money(c.price*c.qty)}</td>
+ <td><button class="btn alt" data-d="${i}">Remove</button></td></tr>`).join("");total()}
+function total(){const s=cart.reduce((a,c)=>a+c.price*c.qty,0);$("tot").textContent=money(Math.max(0,s-(+$("disc").value||0)))}
+$("cart").onchange=e=>{if(!e.target.classList.contains("q"))return;const c=cart[e.target.dataset.i],m=db.meds.find(x=>x.id===c.id);
+ let q=Math.max(1,parseInt(e.target.value)||1);if(q>m.qty){q=m.qty;msg("Only "+m.qty+" in stock",1)}c.qty=q;drawCart()};
+$("cart").onclick=e=>{if(e.target.dataset.d!=null){cart.splice(e.target.dataset.d,1);drawCart()}};
+$("disc").oninput=total;
+$("scan").onkeydown=e=>{if(e.key!=="Enter")return;e.preventDefault();const v=e.target.value.trim();if(!v)return;
+ const ex=db.meds.find(m=>m.barcode&&m.barcode===v);
+ if(ex){addToCart(ex);e.target.value="";$("res").innerHTML="";return}
+ const f=find(v);
+ if(f.length===1){addToCart(f[0]);e.target.value="";$("res").innerHTML=""}
+ else if(f.length>1)msg("Several matches. Click one below.");else msg("Not found: "+v+". Add it in Medicines.",1)};
+$("scan").oninput=e=>{const v=e.target.value.trim();$("res").innerHTML=v.length<2?"":find(v).slice(0,8).map(m=>`<div data-id="${m.id}">${esc(m.name)} <span class="mut">(stock ${m.qty}, PKR ${m.sell})</span></div>`).join("")};
+$("res").onclick=e=>{const d=e.target.closest("div[data-id]");if(!d)return;addToCart(db.meds.find(m=>m.id==d.dataset.id));$("scan").value="";$("res").innerHTML="";$("scan").focus()};
+function find(v){v=v.toLowerCase();return db.meds.filter(m=>m.name.toLowerCase().includes(v)||(m.barcode||"").toLowerCase().includes(v))}
+$("clr").onclick=()=>{cart=[];$("disc").value=0;drawCart();$("scan").focus()};
+$("pay").onclick=()=>{if(!cart.length){msg("Cart is empty",1);return}
+ const sub=cart.reduce((a,c)=>a+c.price*c.qty,0),d=Math.min(+$("disc").value||0,sub);
+ for(const c of cart){const m=db.meds.find(x=>x.id===c.id);if(!m||c.qty>m.qty){msg("Stock changed for "+c.name,1);return}}
+ cart.forEach(c=>db.meds.find(x=>x.id===c.id).qty-=c.qty);
+ const sale={no:db.next++,time:new Date().toISOString(),day:today(),items:cart.map(c=>({...c})),disc:d,total:money(sub-d)};
+ db.sales.push(sale);save();printBill(sale);cart=[];$("disc").value=0;drawCart();msg("Bill #"+sale.no+" saved");$("scan").focus()};
+function printBill(s){const sh=db.shop,t=new Date(s.time);
+ $("rcpt").innerHTML=`<div style="text-align:center"><b style="font-size:15px">${esc(sh.name)}</b><br>${esc(sh.addr)}<br>${esc(sh.phone)}</div><hr>
+ Bill #${s.no}<br>${t.toLocaleDateString()} ${t.toLocaleTimeString()}<hr>
+ <table style="width:100%"><tr><th align="left">Item</th><th>Qty</th><th align="right">Amt</th></tr>
+ ${s.items.map(i=>`<tr><td>${esc(i.name)}<br>@${i.price}</td><td align="center">${i.qty}</td><td align="right">${money(i.price*i.qty)}</td></tr>`).join("")}</table><hr>
+ ${s.disc?`Discount: ${s.disc}<br>`:""}<b style="font-size:15px">TOTAL: PKR ${s.total}</b><hr><div style="text-align:center">Thank you. Get well soon.</div><br>`;
+ setTimeout(()=>window.print(),100)}
+// medicines
+function listMeds(){const q=$("m_find").value.trim().toLowerCase(),t=today();
+ $("mlist").innerHTML=db.meds.filter(m=>!q||m.name.toLowerCase().includes(q)||(m.barcode||"").toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name))
+ .map(m=>`<tr><td>${esc(m.name)}</td><td>${esc(m.barcode)}</td><td>${esc(m.batch)}</td><td class="${m.expiry&&m.expiry<t?"bad":""}">${esc(m.expiry)}</td>
+ <td class="r">${m.sell}</td><td class="r ${m.qty<=m.min?"warn":""}">${m.qty}</td>
+ <td style="white-space:nowrap"><button class="btn alt" data-e="${m.id}">Edit</button> <button class="btn bad" data-x="${m.id}">Delete</button></td></tr>`).join("")||`<tr><td colspan="7" class="mut">No medicines yet. Add your first one above.</td></tr>`}
+$("m_find").oninput=listMeds;
+$("m_bc").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();$("m_name").focus()}};
+function clearForm(){editId=null;["m_bc","m_name","m_batch","m_exp","m_buy","m_sell","m_qty"].forEach(i=>$(i).value="");$("m_min").value=10;$("mt").textContent="Add medicine";$("m_bc").focus()}
+$("m_cancel").onclick=()=>{clearForm();$("m_msg").textContent=""};
+$("m_save").onclick=()=>{const name=$("m_name").value.trim(),bc=$("m_bc").value.trim(),sell=parseFloat($("m_sell").value);
+ if(!name||isNaN(sell)){$("m_msg").textContent="Enter a name and a sell price.";return}
+ if(bc&&db.meds.some(m=>m.barcode===bc&&m.id!==editId)){$("m_msg").textContent="This barcode already belongs to another medicine.";return}
+ const o={barcode:bc,name,batch:$("m_batch").value.trim(),expiry:$("m_exp").value,buy:parseFloat($("m_buy").value)||0,sell,qty:parseInt($("m_qty").value)||0,min:parseInt($("m_min").value)||0};
+ if(editId){Object.assign(db.meds.find(m=>m.id===editId),o)}else db.meds.push({id:Date.now()+Math.random(),...o});
+ save();$("m_msg").textContent="Saved "+name;clearForm();listMeds()};
+$("mlist").onclick=e=>{const ed=e.target.dataset.e,x=e.target.dataset.x;
+ if(ed){const m=db.meds.find(v=>v.id==ed);editId=m.id;$("m_bc").value=m.barcode;$("m_name").value=m.name;$("m_batch").value=m.batch;$("m_exp").value=m.expiry;
+  $("m_buy").value=m.buy;$("m_sell").value=m.sell;$("m_qty").value=m.qty;$("m_min").value=m.min;$("mt").textContent="Edit medicine";window.scrollTo(0,0)}
+ if(x&&confirm("Delete this medicine?")){db.meds=db.meds.filter(v=>v.id!=x);save();listMeds()}};
+// reports
+function report(){if(!$("r_day").value)$("r_day").value=today();const d=$("r_day").value,s=db.sales.filter(x=>x.day===d);
+ $("r_tot").textContent=money(s.reduce((a,x)=>a+x.total,0));$("r_n").textContent=s.length;
+ $("r_list").innerHTML=s.map(x=>`<tr><td>#${x.no}</td><td>${new Date(x.time).toLocaleTimeString()}</td><td>${x.items.length} items</td><td class="r">${x.total}</td><td class="r"><button class="btn alt" data-p="${x.no}">Reprint</button></td></tr>`).join("")||`<tr><td class="mut">No bills on this day.</td></tr>`;
+ const low=db.meds.filter(m=>m.qty<=m.min);$("r_low").innerHTML=low.map(m=>`<tr><td>${esc(m.name)}</td><td class="r warn">${m.qty} left</td></tr>`).join("")||`<tr><td class="mut">Nothing is running low.</td></tr>`;
+ const lim=new Date(Date.now()+60*864e5).toISOString().slice(0,10),ex=db.meds.filter(m=>m.expiry&&m.expiry<=lim&&m.qty>0).sort((a,b)=>a.expiry.localeCompare(b.expiry));
+ $("r_exp").innerHTML=ex.map(m=>`<tr><td>${esc(m.name)} (batch ${esc(m.batch)})</td><td class="r ${m.expiry<today()?"bad":"warn"}">${m.expiry}</td><td class="r">${m.qty} units</td></tr>`).join("")||`<tr><td class="mut">Nothing is near expiry.</td></tr>`}
+$("r_day").onchange=report;
+$("r_list").onclick=e=>{if(e.target.dataset.p)printBill(db.sales.find(x=>x.no==e.target.dataset.p))};
+// settings and backup
+function loadShop(){$("s_name").value=db.shop.name;$("s_addr").value=db.shop.addr;$("s_ph").value=db.shop.phone}
+$("s_save").onclick=()=>{db.shop={name:$("s_name").value.trim()||"My Pharmacy",addr:$("s_addr").value.trim(),phone:$("s_ph").value.trim()};save();$("b_msg").textContent="Shop details saved."};
+$("b_out").onclick=()=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(db)],{type:"application/json"}));
+ a.download="pharmacy-backup-"+today()+".json";a.click();$("b_msg").textContent="Backup downloaded. Copy it to a USB drive."};
+$("b_in").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+ r.onload=()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d.meds)||!Array.isArray(d.sales))throw 0;
+  if(confirm("Replace all current data with this backup?")){db=Object.assign(db,d);save();$("b_msg").textContent="Backup restored.";loadShop()}}catch(x){$("b_msg").textContent="That file is not a valid backup."}};r.readAsText(f)};
+// data folder (saves to the hard disk)
+let dirH=null;
+function idb(){return new Promise((res,rej)=>{const r=indexedDB.open("pharm_h",1);r.onupgradeneeded=()=>r.result.createObjectStore("h");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function idbGet(k){try{const d=await idb();return await new Promise(res=>{const q=d.transaction("h").objectStore("h").get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>res(null)})}catch(e){return null}}
+async function idbSet(k,v){const d=await idb();return new Promise(res=>{const t=d.transaction("h","readwrite");t.objectStore("h").put(v,k);t.oncomplete=()=>res()})}
+function status(t,btn,fn,bad){$("disk_t").textContent=t;$("disk_t").style.color=bad?"var(--bad)":"var(--pri)";const b=$("disk_b");b.classList.toggle("hide",!btn);if(btn){b.textContent=btn;b.onclick=fn}}
+async function writeFile(n,t){const w=await(await dirH.getFileHandle(n,{create:true})).createWritable();await w.write(t);await w.close()}
+async function writeDisk(){if(!dirH)return;try{const t=JSON.stringify(db);await writeFile("pharmacy-data.json",t);await writeFile("backup-"+today()+".json",t);status("Saved to folder \""+dirH.name+"\" with a daily backup copy.")}catch(e){status("NOT SAVING TO DISK. Click Reconnect folder, then Allow.","Reconnect folder",connect,1)}}
+async function readDisk(){try{const f=await(await dirH.getFileHandle("pharmacy-data.json")).getFile();return JSON.parse(await f.text())}catch(e){return null}}
+function refresh(){drawCart();loadShop();if(!$("meds").classList.contains("hide"))listMeds();if(!$("rep").classList.contains("hide"))report()}
+async function useFolder(){const d=await readDisk();if(d&&Array.isArray(d.meds)&&(d.saved||0)>=(db.saved||0))db=Object.assign(db,d);refresh();save()}
+async function connect(){try{if(!dirH){const h=await showDirectoryPicker({mode:"readwrite"});await idbSet("dir",h);dirH=h}else if(await dirH.requestPermission({mode:"readwrite"})!=="granted")throw 0;await useFolder()}
+ catch(e){if(e&&e.name==="AbortError")return;status("Could not use that folder. Create a new folder such as C:\\PharmacyData and choose it.","Choose data folder",()=>{dirH=null;connect()},1)}}
+(async()=>{if(!window.showDirectoryPicker){status("This browser cannot save to a folder. Open the app in Chrome or Edge.",null,null,1);return}
+ dirH=await idbGet("dir");if(!dirH){status("Data is only inside the browser. Choose a folder so it is saved on the hard disk.","Choose data folder",connect,1);return}
+ if(await dirH.queryPermission({mode:"readwrite"})==="granted")await useFolder();else status("NOT SAVING TO DISK. Click Reconnect folder, then Allow. New bills are only in the browser until you do.","Reconnect folder",connect,1)})();
+let asked=false;
+document.addEventListener("click",async e=>{if(asked||!dirH||$("disk_b").classList.contains("hide")||e.target.id==="disk_b")return;asked=true;
+ try{if(await dirH.requestPermission({mode:"readwrite"})==="granted")await useFolder()}catch(x){}},true);
+drawCart();$("scan").focus();
+document.addEventListener("click",e=>{if(!$("bill").classList.contains("hide")&&e.target.tagName!=="INPUT"&&e.target.tagName!=="BUTTON")$("scan").focus()});
+</script></body></html>
